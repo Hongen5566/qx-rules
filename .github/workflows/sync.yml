@@ -1,0 +1,40 @@
+name: Sync rules
+
+on:
+  schedule:
+    # 每天 UTC 03:00（北京时间 11:00）同步一次
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download rule lists
+        run: |
+          set -euo pipefail
+          mkdir -p rules
+          for c in AdvertisingLite Apple OpenAI YouTube Netflix Global China ChinaIPs; do
+            echo "-> $c"
+            curl -fsSL --retry 3 --retry-delay 5 \
+              "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/QuantumultX/$c/$c.list" \
+              -o "rules/$c.list"
+          done
+
+      - name: Commit changes
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add rules
+          if git diff --cached --quiet; then
+            echo "规则无变化，跳过提交"
+          else
+            git commit -m "chore: sync rules $(date -u +%Y-%m-%d)"
+            git push
+          fi
